@@ -153,7 +153,7 @@ int main() {
     // [0, 1, 2, 3, 4, 5] => [[0, 1] [2, 3] [4, 5]] kinda
     // GL_FALSE just means that the shaders do not need to be normalized to between -1.0 and 1.0
     glVertexAttribPointer(posAttribute, 2, GL_FLOAT, GL_FALSE, 0,0);
-    // endable the position attribute
+    // enable the position attribute
     glEnableVertexAttribArray(posAttribute);
 
     // setting Shader Color
