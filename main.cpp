@@ -4,6 +4,27 @@
 
 float deltaTime = 0.0f, lastTime = 0.0f;
 
+const char* vertexSource = R"glsl(
+#version 330 core
+layout (location = 0) in vec2 position;
+
+void main(){
+    gl_Position = vec4(position, 0.0f, 1.0f);
+}
+)glsl";
+
+const char* fragmentSource = R"glsl(
+#version 330 core
+
+uniform vec3 triangleColor;
+
+out vec4 outColor;
+
+void main(){
+    outColor = vec4(triangleColor, 1.0f);
+}
+)glsl";
+
 void error_callback(int error, const char* description){
     fprintf(stderr, "ERROR: %s\n", description);
 }
@@ -68,12 +89,90 @@ int main() {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0,0,width, height);
 
+    // setting up a triangle
+    float vertices[] = {
+            0.0f, 0.5f, // top corner
+            0.5f, -0.5f, // bottom right
+            -0.5f, -0.5f // bottom left
+    };
+
+    // sending data to GPU
+    // GLuint is cross-platform for unsigned int
+    // create vertex buffer object and Vertex Array Object
+    GLuint vbo, vao;
+    glGenBuffers(1, &vbo);
+    glGenVertexArrays(1, &vao);
+    // upload data to GPU
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindVertexArray(vao);
+    // bind data to buffer and therefore GPU
+    glBufferData(GL_ARRAY_BUFFER, sizeof (vertices), vertices, GL_STATIC_DRAW);
+
+    // Shader Shit
+    // create vertex Shader object
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    // load data to Vertex Shader Object
+    glShaderSource(vertexShader, 1, &vertexSource, NULL);
+    // compile Shader
+    glCompileShader(vertexShader);
+    // check for shader comp errors
+    char infoLog[512];
+    GLint status;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &status);
+    if (status == GL_FALSE){
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: VERTEX" << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+    }
+
+    // create Fragment Shader object
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    // load data
+    glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
+    // compile
+    glCompileShader(fragmentShader);
+    // check for comp errors
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &status);
+    if (status == GL_FALSE){
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: FRAGMENT" << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+    }
+
+    // combine shaders into a program;
+    GLuint shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    // link program
+    glLinkProgram(shaderProgram);
+    // use newly made shader program
+    glUseProgram(shaderProgram);
+
+    // get reference to the position in vShader
+    GLint posAttribute = glGetAttribLocation(shaderProgram, "position");
+
+    // tell shader that position takes two float values starting at position 0 with 0 bytes between them
+    // [0, 1, 2, 3, 4, 5] => [[0, 1] [2, 3] [4, 5]] kinda
+    // GL_FALSE just means that the shaders do not need to be normalized to between -1.0 and 1.0
+    glVertexAttribPointer(posAttribute, 2, GL_FLOAT, GL_FALSE, 0,0);
+    // endable the position attribute
+    glEnableVertexAttribArray(posAttribute);
+
+    // setting Shader Color
+    //get ref to triangle color var in frag shader
+    GLint outputColor = glGetUniformLocation(shaderProgram, "triangleColor");
+    //set outputColor to values
+    glUniform3f(outputColor, 0.3f, 0.8f, 0.9f);
+
     // GAMELOOP TIME!!
     while (!glfwWindowShouldClose(window)){
         // getting delta time so movement isn't dependent on frame rate
         float currentTime = glfwGetTime();
         deltaTime = currentTime - lastTime;
         lastTime = currentTime;
+
+        // drawing
+        // drawing triangles
+        // first specifies primitive (triangles, lines) second is were to start in the vertex array and third is the number of vertices to process
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         glfwSwapBuffers(window);
         glfwPollEvents();
