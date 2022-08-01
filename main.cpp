@@ -152,15 +152,21 @@ int main() {
 
     };
     GLuint indices[] = {
+            // front face
             0, 1, // first line
             1, 2, // second line
             2, 3, // third line
             3, 0, //fourth line
+            // back face
             4, 5,
             5, 6,
             6, 7,
             7, 4,
+            // connecting faces
             0, 4,
+            1, 5,
+            2, 6,
+            3, 7
 
     };
 
@@ -240,7 +246,7 @@ int main() {
             int modelLoc = glGetUniformLocation(shaderProgram, "model");
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
-            glDrawElements(GL_LINES, 16, GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
         }
         firstFrame = false;
         glBindVertexArray(0);
