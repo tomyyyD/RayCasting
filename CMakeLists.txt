@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 add_executable(RayCasting main.cpp)
 
 include_directories(/opt/homebrew/include)
+include_directories(./include/glm)
 
 find_package(glfw3 REQUIRED)
 target_link_libraries(RayCasting glfw)
