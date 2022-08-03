@@ -1,7 +1,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <glm/glm.hpp>a
+#include <cstdlib>
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -23,16 +24,22 @@ void main(){
 const char* fragmentSource = R"glsl(
 #version 330 core
 
-uniform vec3 triangleColor;
+uniform vec4 triangleColor;
 
 out vec4 outColor;
 
 void main(){
-    outColor = vec4(triangleColor, 1.0f);
+    outColor = triangleColor;
 }
 )glsl";
+const float WIDTH = 1600.0f, HEIGHT = 900.0f;
+const int outputs = 2880;
+float magnitudes[outputs][2];
+float rayInfo[outputs][3];
+float mouseX = 0.0f, mouseY = 0.0f;
+float prevMouseX = WIDTH, prevMouseY = HEIGHT;
 
-bool firstFrame = true;
+glm::vec3 startPt = glm::vec3(WIDTH/2.0f, HEIGHT/2.0f, 0.0f);
 
 void error_callback(int error, const char* description){
     fprintf(stderr, "ERROR: %s\n", description);
@@ -45,6 +52,91 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     glViewport(0,0, width, height);
+}
+
+void mouse_pos_callback(GLFWwindow* window, double xpos, double ypos){
+//    if (firstFrame){
+//        prevMouseX = xpos;
+//        prevMouseY = ypos;
+//    }
+//    float xOffset = xpos - prevMouseX;
+//    float yOffset = xpos - prevMouseY;
+//    prevMouseX = xpos;
+//    prevMouseY = ypos;
+//
+//    const float sens = 1 * deltaTime;
+//    xOffset *= sens;
+//    yOffset *= sens;
+    mouseX = xpos;
+    mouseY = ypos;
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
+//        float xOffset = mouseX - prevMouseX;
+//        float yOffset = mouseY - prevMouseY;
+        prevMouseX = mouseX;
+        prevMouseY = mouseY;
+
+        startPt.x = prevMouseX;
+        startPt.y = HEIGHT - prevMouseY;
+
+        for (unsigned int i = 0;  i < outputs; i ++){
+            float angle = i * 360.0f/outputs;
+            float magnitude1 = 0.0f;
+            float magnitude2 = 0.0f;
+
+            if (angle >= 0 && angle < 90){
+                //quadrant one
+                magnitude2 = abs((WIDTH - startPt.x) / cos(glm::radians(angle)));
+                magnitude1 = abs((HEIGHT - startPt.y) / sin(glm::radians(angle)));
+            }else if (angle >= 90 && angle < 180){
+                magnitude2 = abs((startPt.x) / cos(glm::radians(angle)));
+                magnitude1 = abs((HEIGHT - startPt.y) / sin(glm::radians(angle)));
+            }else if (angle >= 180 && angle < 270) {
+                magnitude2 = abs((startPt.x) / cos(glm::radians(angle)));
+                magnitude1 = abs((startPt.y) / sin(glm::radians(angle)));
+            }else {
+                magnitude2 = abs((WIDTH - startPt.x) / cos(glm::radians(angle)));
+                magnitude1 = abs((startPt.y) / sin(glm::radians(angle)));
+            }
+            if (magnitude1 > magnitude2){
+                magnitudes[i][0] = magnitude2;
+            }else{
+                magnitudes[i][0] = magnitude1;
+            }
+            // angle mirrored along y axis
+            float tempAngle = 0.0f;
+            rayInfo[i][0] = 180 - angle;
+            // coordinates for point of the collision
+            rayInfo[i][1] = startPt.x - magnitudes[i][0] * cos(glm::radians(rayInfo[i][0]));
+            rayInfo[i][2] = startPt.y + magnitudes[i][0] * sin(glm::radians(rayInfo[i][0]));
+            if (magnitude1 < magnitude2) {
+                rayInfo[i][0] -= 180;
+            }
+
+            //bounce 1
+            if ((rayInfo[i][0] >= 0 && rayInfo[i][0] < 90) || (rayInfo[i][0] < -270 && rayInfo[i][0] >= -360)){
+                //quadrant one
+                magnitude2 = abs((WIDTH - rayInfo[i][1]) / cos(glm::radians(rayInfo[i][0])));
+                magnitude1 = abs((HEIGHT - rayInfo[i][2]) / sin(glm::radians(rayInfo[i][0])));
+            }else if ((rayInfo[i][0] >= 90 && rayInfo[i][0] < 180) || (rayInfo[i][0] < -180 && rayInfo[i][0] >= -270)){
+                magnitude2 = abs((rayInfo[i][1]) / cos(glm::radians(rayInfo[i][0])));
+                magnitude1 = abs((HEIGHT - rayInfo[i][2]) / sin(glm::radians(rayInfo[i][0])));
+            }else if ((rayInfo[i][0] >= 180 && rayInfo[i][0] < 270) || rayInfo[i][0] < -90 && rayInfo[i][0] >= -180) {
+                magnitude2 = abs((rayInfo[i][1]) / cos(glm::radians(rayInfo[i][0])));
+                magnitude1 = abs((rayInfo[i][2]) / sin(glm::radians(rayInfo[i][0])));
+            }else if ((rayInfo[i][0] >= 270 && rayInfo[i][0] < 360) || (rayInfo[i][0] < 0 && rayInfo[i][0] >= -90)){
+                magnitude2 = abs((WIDTH - rayInfo[i][1]) / cos(glm::radians(rayInfo[i][0])));
+                magnitude1 = abs((rayInfo[i][2]) / sin(glm::radians(rayInfo[i][0])));
+            }
+            if (magnitude1 > magnitude2){
+                magnitudes[i][1] = magnitude2;
+            }else{
+                magnitudes[i][1] = magnitude1;
+            }
+        }
+    }
 }
 
 int main() {
@@ -69,7 +161,7 @@ int main() {
 #endif
 
     // creating the window
-    window = glfwCreateWindow(800, 600, "RayCasting", nullptr, nullptr);
+    window = glfwCreateWindow(WIDTH, HEIGHT, "RayCasting", nullptr, nullptr);
     if(!window){
         glfwTerminate();
         std::cout << "error creating window" << std::endl;
@@ -91,7 +183,8 @@ int main() {
     // setting up callback functions
     glfwSetKeyCallback(window, key_callback);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    //glfwSetCursorPosCallback() will set at some point soon
+    glfwSetCursorPosCallback(window, mouse_pos_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     // setting up the window
     int width, height;
@@ -137,37 +230,42 @@ int main() {
     // use newly made shader program
     glUseProgram(shaderProgram);
 
-    // setting up a triangle
+//    float vertices[] = {
+//            //front face
+//            50.0f, 50.0f, 10.0f,// top right
+//            50.0f, -50.0f, 10.0f, // bottom right
+//            -50.0f, -50.0f, 10.0f, // bottom left
+//            -50.0f, 50.0f, 1.0f, // top left
+//            //back face
+//            50.0f, 50.0f, -1.0f,// top right
+//            50.0f, -50.0f, -1.0f, // bottom right
+//            -50.0f, -50.0f, -1.0f, // bottom left
+//            -50.0f, 50.0, -1.0f, // top left
+//    };
+//    GLuint indices[] = {
+//            // front face
+//            0, 1,
+//            1, 2,
+//            2, 3,
+//            3, 0,
+//            // back face
+//            4, 5,
+//            5, 6,
+//            6, 7,
+//            7, 4,
+//            // connecting faces
+//            0, 4,
+//            1, 5,
+//            2, 6,
+//            3, 7
+//    };
+
     float vertices[] = {
-            //front face
-            0.5f, 0.5f, 0.5f,// top right
-            0.5f, -0.5f, 0.5f, // bottom right
-            -0.5f, -0.5f, 0.5f, // bottom left
-            -0.5, 0.5, 0.5f, // top left
-            //back face
-            0.5f, 0.5f, -0.5f,// top right
-            0.5f, -0.5f, -0.5f, // bottom right
-            -0.5f, -0.5f, -0.5f, // bottom left
-            -0.5, 0.5, -0.5f, // top left
-
+            1.0, 0.0f, 1.0f, // start point
+            0.0f, 0.0f, 1.0f //endpoint
     };
-    GLuint indices[] = {
-            // front face
-            0, 1, // first line
-            1, 2, // second line
-            2, 3, // third line
-            3, 0, //fourth line
-            // back face
-            4, 5,
-            5, 6,
-            6, 7,
-            7, 4,
-            // connecting faces
-            0, 4,
-            1, 5,
-            2, 6,
-            3, 7
-
+    float indices[] = {
+            0,1
     };
 
     // sending data to GPU
@@ -198,10 +296,13 @@ int main() {
 
     // projection matrix is the view type (perspective/orthographic) and the settings for that
     glm::mat4 projection;
-    projection = glm::perspective(glm::radians(45.0f), 800.0f/600.0f, 0.1f, 100.0f);
+    projection = glm::ortho(0.0f, WIDTH, 0.0f, HEIGHT, 0.1f, 100.00f);
     // sends projection data to shader
     int projLoc = glGetUniformLocation(shaderProgram, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+    GLint outputColor = glGetUniformLocation(shaderProgram, "triangleColor");
+//    glUniform3f(outputColor, sin(i*M_PI/18.0f)/2 + 0.5, cos(i * M_PI/18.0f)/2 + 0.5, 0.9f);
 
     // GAME LOOP TIME!!
     while (!glfwWindowShouldClose(window)){
@@ -219,36 +320,60 @@ int main() {
 
         // view matrix is where the camera will be positioned
         glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -1.0f));
         // sends view data to vertex shader
         int viewLoc = glGetUniformLocation(shaderProgram, "view");
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-
-        for (GLuint i = 0; i < 36; i ++){
+        glUniform4f(outputColor, 1.0f, 1.0f, 1.0f, 1.0f);
+        for (GLuint i = 0; i < outputs; i ++){
             // setting Shader Color
             // get ref to triangle color var in frag shader
-            GLint outputColor = glGetUniformLocation(shaderProgram, "triangleColor");
+            float angle = i * 360.0f/outputs;
             // set outputColor to values
-            glUniform3f(outputColor, sin(i*M_PI/18.0f)/2 + 0.5, cos(i * M_PI/18.0f)/2 + 0.5, 0.9f);
-            if (firstFrame){
-                std::cout << sin(i/18.0f * M_PI) << std::endl;
-            }
+//            glUniform3f(outputColor, sin(i*M_PI/18.0f)/2 + 0.5, cos(i * M_PI/18.0f)/2 + 0.5, 0.9f);
+
             // going 3-D
             // model matrix is the transforms applied to all objects vertices to convert from local to world space
             // initialized to the 4x4 identity matrix
             glm::mat4 model = glm::mat4(1.0f);
             // rotate models 55 degrees along the x-axis
-            model = glm::rotate(model, (float)glfwGetTime() + glm::radians(i * 10.0f), glm::vec3(0.5f, 1.0f, 0.5f));
-//            model = glm::translate(model, glm::vec3(0.0f, 0.0f, i * 1.0f));
+            model = glm::translate(model, startPt);
+            model = glm::rotate(model, glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, glm::vec3(magnitudes[i][0], 0.0f, 0.0f));
 
             // send models transformation data to the vertex shader
             int modelLoc = glGetUniformLocation(shaderProgram, "model");
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
-            glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
+//            glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT, 0);
         }
-        firstFrame = false;
+        glUniform4f(outputColor, 0.0f, 1.0f, 0.0f, 1.0f);
+        for (GLuint i = 0; i < outputs; i ++){
+            // setting Shader Color
+            // get ref to triangle color var in frag shader
+            float angle = 36.0f - i * 360.0f/outputs;
+            // set outputColor to values
+//            glUniform3f(outputColor, sin(i*M_PI/18.0f)/2 + 0.5, cos(i * M_PI/18.0f)/2 + 0.5, 0.9f);
+
+            // going 3-D
+            // model matrix is the transforms applied to all objects vertices to convert from local to world space
+            // initialized to the 4x4 identity matrix
+            glm::mat4 model = glm::mat4(1.0f);
+            // rotate models 55 degrees along the x-axis
+//            model = glm::translate(model, startPt);
+            model = glm::translate(model, glm::vec3(rayInfo[i][1], rayInfo[i][2], 0.0f));
+            model = glm::rotate(model, glm::radians(rayInfo[i][0]), glm::vec3(0.0f, 0.0f, 1.0f));
+            model = glm::scale(model, glm::vec3(magnitudes[i][1], 0.0f, 0.0f));
+
+//            std::cout << rayInfo[i][0] << std::endl;
+
+            // send models transformation data to the vertex shader
+            int modelLoc = glGetUniformLocation(shaderProgram, "model");
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+            glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT, 0);
+        }
         glBindVertexArray(0);
 
         glfwSwapBuffers(window);
